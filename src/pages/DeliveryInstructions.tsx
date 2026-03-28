@@ -49,7 +49,7 @@ const DeliveryInstructions: React.FC = () => {
             </div>
             <h3 className="heading-sm mb-4" style={{ fontSize: '1.25rem' }}>Service Limit</h3>
             <p className="text-muted" style={{ lineHeight: '1.6' }}>
-              To maintain service quality, we currently <b><u>deliver up to 15km</u></b> from our central hub.
+              To maintain service quality, we currently <b><u>deliver up to 15km</u></b> from our local store.
             </p>
             <br />
           </div>

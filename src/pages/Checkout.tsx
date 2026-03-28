@@ -13,19 +13,40 @@ const Checkout: React.FC = () => {
 
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
-  const [formData, setFormData] = useState({
-    fullName: '',
-    mobile: '',
-    village: '',
-    mandal: '',
-    district: 'Peddapalli',
-    state: 'Telangana',
-    pincode: '',
-    quantity: 1
+
+  // 1. Initialize state from sessionStorage OR default values
+  interface CheckoutFormData {
+    fullName: string;
+    mobile: string;
+    village: string;
+    mandal: string;
+    district: string;
+    state: string;
+    pincode: string;
+    quantity: number;
+  }
+
+  const [formData, setFormData] = useState<CheckoutFormData>(() => {
+    const savedData = sessionStorage.getItem(`checkoutFormData_${id}`);
+    return savedData ? JSON.parse(savedData) : {
+      fullName: user?.username || '',
+      mobile: '',
+      village: '',
+      mandal: '',
+      district: '',
+      state: 'Telangana',
+      pincode: '',
+      quantity: 1
+    };
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // 2. Save to sessionStorage whenever user types
+  useEffect(() => {
+    sessionStorage.setItem(`checkoutFormData_${id}`, JSON.stringify(formData));
+  }, [formData, id]);
 
   useEffect(() => {
     if (!id) return;
@@ -41,14 +62,17 @@ const Checkout: React.FC = () => {
       });
   }, [id]);
 
+  // Ensure user data populates if loaded later
   useEffect(() => {
-    if (user) {
-      setFormData(prev => ({
-        ...prev,
-        fullName: user.username || ''
-      }));
+    if (user && !formData.fullName) {
+      setFormData(prev => ({ ...prev, fullName: user.username || '' }));
     }
   }, [user]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
 
   const validate = () => {
     const newErrors: Record<string, string> = {};
@@ -88,7 +112,10 @@ const Checkout: React.FC = () => {
 
       await addOrder(orderData as any);
 
-      // Automated WhatsApp message (Task 11)
+      // Clear storage after successful order
+      sessionStorage.removeItem(`checkoutFormData_${id}`);
+
+      // Automated WhatsApp message
       const whatsappNumber = "919959916507";
       const priceText = (!product.pricingType || product.pricingType === 'standard') ? formatCurrency(product.price) : "Contact for Price";
       const message = `Hii, \n I am ${formData.fullName}, i want to buy ${product.name} which was ${priceText}. \n Confirm my order and share more details about delivery.`;
@@ -104,41 +131,41 @@ const Checkout: React.FC = () => {
     }
   };
 
-  if (loading) return <div className="text-center section heading-md text-muted">Loading Checkout...</div>;
-  if (!product) return <div className="text-center section heading-md text-muted">Product Not Found</div>;
+  if (loading) return <div className="checkout-loading">Loading Checkout...</div>;
+  if (!product) return <div className="checkout-loading">Product Not Found</div>;
 
   return (
-    <div className="section container animate-fade-in" style={{ padding: '3rem 1.5rem', minHeight: '90vh' }}>
-      <div className="max-w-4xl mx-auto">
-        <Link to={`/products/${id}`} className="flex items-center gap-2 text-primary hover:underline mb-8 font-semibold">
+    <div className="checkout-page">
+      <div className="checkout-container">
+
+        <Link to={`/products/${id}`} className="back-link">
           <ArrowLeft size={18} /> Back to Product
         </Link>
-        <br />
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Order Summary */}
-          <div className="lg:col-span-1">
-            <div className="card shadow-xl p-6 sticky top-24 bg-white" style={{ borderRadius: '1.5rem', border: '1px solid #f1f5f9' }}>
-              <br />
-              <h2 className="heading-sm mb-6 flex items-center gap-2">
-                &nbsp; &nbsp; <Package size={20} className="text-primary" />&nbsp; &nbsp;Order Summary
-              </h2>
-              <br />
-              <div className="checkout-summary-content">
-                <div className="checkout-summary-image-wrapper">
+        <div className="checkout-grid">
+
+          {/* Column 1: Order Summary */}
+          <div className="checkout-col-summary">
+            <div className="summary-card">
+              <div className="summary-header">
+                <Package size={20} className="icon-blue" />
+                <h2>Order Summary</h2>
+              </div>
+
+              <div className="product-details-layout">
+                <div className="product-image-box">
                   <img
                     src={product.image || (product.images && product.images[0]) || 'https://via.placeholder.com/300'}
                     alt={product.name}
-                    className="checkout-summary-img"
                   />
                 </div>
-                <div className="checkout-summary-details">
-                  <h3 className="checkout-summary-name">{product.name}</h3>
-                  <p className="checkout-summary-price">
+                <div className="product-info-text">
+                  <h3>{product.name}</h3>
+                  <p className="price-text">
                     {(!product.pricingType || product.pricingType === 'standard') ? formatCurrency(product.price) : 'Contact for Price'}
                   </p>
                   {product.promises?.delivery && (
-                    <div className="flex items-center gap-2 text-green-600 font-bold bg-green-50 px-3 py-2 rounded-lg text-xs mt-2 w-fit">
+                    <div className="delivery-badge">
                       <CheckCircle size={14} /> Delivery Available
                     </div>
                   )}
@@ -147,164 +174,403 @@ const Checkout: React.FC = () => {
             </div>
           </div>
 
-          {/* Checkout Form */}
-          <div className="lg:col-span-2">
-            <div className="card shadow-2xl p-8 md:p-14 bg-white" style={{ borderRadius: '2.5rem', border: '1px solid #f1f5f9' }}>
-              <h1 className="heading-md mb-10 px-2" style={{ borderLeft: '4px solid var(--color-primary)', paddingLeft: '1.5rem' }}>Enter Order Details</h1>
+          {/* Column 2: Form */}
+          <div className="checkout-col-form">
+            <div className="form-card">
+              <h1 className="form-title">Enter Order Details</h1>
 
-              <form onSubmit={handleSubmit} className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Full Name */}
-                  <div className="md:col-span-2">
-                    <label className="form-label flex items-center gap-2"><User size={16} /> Full Name</label>
+              <form onSubmit={handleSubmit} className="order-form">
+
+                {/* Full Name & Mobile */}
+                <div className="form-row">
+                  <div className="form-group full-width">
+                    <label><User size={16} /> Full Name <span className="req">*</span></label>
                     <input
                       type="text"
-                      className={`form-input-premium ${errors.fullName ? 'border-red-500' : ''}`}
+                      name="fullName"
+                      className={errors.fullName ? 'input-error' : ''}
                       value={formData.fullName}
-                      onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
+                      onChange={handleChange}
                       placeholder="Enter your full name"
+                      required
                     />
-                    {errors.fullName && <p className="text-xs text-red-500 mt-1 flex items-center gap-1"><AlertCircle size={12} /> {errors.fullName}</p>}
-                  </div>
-
-                  {/* Mobile */}
-                  <div>
-                    <label className="form-label flex items-center gap-2"><Phone size={16} /> Mobile Number</label>
-                    <input
-                      type="tel"
-                      maxLength={10}
-                      className={`form-input-premium ${errors.mobile ? 'border-red-500' : ''}`}
-                      value={formData.mobile}
-                      onChange={(e) => setFormData({ ...formData, mobile: e.target.value.replace(/\D/g, '') })}
-                      placeholder="10-digit number"
-                    />
-                    {errors.mobile && <p className="text-xs text-red-500 mt-1 flex items-center gap-1"><AlertCircle size={12} /> {errors.mobile}</p>}
-                  </div>
-
-                  {/* Quantity */}
-                  <div>
-                    <label className="form-label flex items-center gap-2"><Package size={16} /> Quantity</label>
-                    <input
-                      type="number"
-                      min="1"
-                      className={`form-input-premium ${errors.quantity ? 'border-red-500' : ''}`}
-                      value={formData.quantity}
-                      onChange={(e) => setFormData({ ...formData, quantity: parseInt(e.target.value) || 1 })}
-                    />
-                    {errors.quantity && <p className="text-xs text-red-500 mt-1 flex items-center gap-1"><AlertCircle size={12} /> {errors.quantity}</p>}
-                  </div>
-
-                  <div className="md:col-span-2 flex items-center gap-4 py-2">
-                    <div className="h-[1px] bg-slate-100 flex-grow"></div>
-                    <span className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                      <MapPin size={14} /> Delivery Address
-                    </span>
-                    <div className="h-[1px] bg-slate-100 flex-grow"></div>
-                  </div>
-
-                  <div>
-                    <label className="form-label">Village</label>
-                    <input
-                      type="text"
-                      className={`form-input-premium ${errors.village ? 'border-red-500' : ''}`}
-                      value={formData.village}
-                      onChange={(e) => setFormData({ ...formData, village: e.target.value })}
-                      placeholder="Village name"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="form-label">Mandal</label>
-                    <input
-                      type="text"
-                      className={`form-input-premium ${errors.mandal ? 'border-red-500' : ''}`}
-                      value={formData.mandal}
-                      onChange={(e) => setFormData({ ...formData, mandal: e.target.value })}
-                      placeholder="Mandal name"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="form-label">District</label>
-                    <input
-                      type="text"
-                      className="form-input-premium bg-slate-50"
-                      value={formData.district}
-                      onChange={(e) => setFormData({ ...formData, district: e.target.value })}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="form-label">PIN Code</label>
-                    <input
-                      type="text"
-                      maxLength={6}
-                      className={`form-input-premium ${errors.pincode ? 'border-red-500' : ''}`}
-                      value={formData.pincode}
-                      onChange={(e) => setFormData({ ...formData, pincode: e.target.value.replace(/\D/g, '') })}
-                      placeholder="6-digit pincode"
-                    />
+                    {errors.fullName && <p className="error-text"><AlertCircle size={12} /> {errors.fullName}</p>}
                   </div>
                 </div>
 
-                <div className="flex flex-col gap-4 mt-8">
-                  {/* Delivery Instructions Small Button (Task 3) */}
-                  <Link
-                    to="/delivery"
-                    className="flex items-center justify-center gap-2 text-primary hover:underline font-bold text-sm bg-blue-50 py-2 rounded-xl self-center px-6"
+                <div className="form-row">
+                  <div className="form-group">
+                    <label><Phone size={16} /> Mobile Number <span className="req">*</span></label>
+                    <input
+                      type="tel"
+                      name="mobile"
+                      maxLength={10}
+                      pattern="[0-9]{10}"
+                      title="10-digit mobile number required"
+                      className={errors.mobile ? 'input-error' : ''}
+                      value={formData.mobile}
+                      onChange={(e) => setFormData({ ...formData, mobile: e.target.value.replace(/\D/g, '') })}
+                      placeholder="10-digit number"
+                      required
+                    />
+                    {errors.mobile && <p className="error-text"><AlertCircle size={12} /> {errors.mobile}</p>}
+                  </div>
+
+                  <div className="form-group">
+                    <label><Package size={16} /> Quantity <span className="req">*</span></label>
+                    <input
+                      type="number"
+                      name="quantity"
+                      min="1"
+                      className={errors.quantity ? 'input-error' : ''}
+                      value={formData.quantity}
+                      onChange={handleChange}
+                      required
+                    />
+                    {errors.quantity && <p className="error-text"><AlertCircle size={12} /> {errors.quantity}</p>}
+                  </div>
+                </div>
+
+                {/* Divider */}
+                <div className="section-divider">
+                  <div className="line"></div>
+                  <span className="divider-text"><MapPin size={14} /> Delivery Address</span>
+                  <div className="line"></div>
+                </div>
+
+                {/* Address Fields */}
+                <div className="form-group full-width">
+                  <label>Village <span className="req">*</span></label>
+                  <input
+                    type="text"
+                    name="village"
+                    className={errors.village ? 'input-error' : ''}
+                    value={formData.village}
+                    onChange={handleChange}
+                    placeholder="Village name"
+                    required
+                  />
+                  {errors.village && <p className="error-text"><AlertCircle size={12} /> {errors.village}</p>}
+                </div>
+
+                <div className="form-group full-width">
+                  <label>Mandal <span className="req">*</span></label>
+                  <input
+                    type="text"
+                    name="mandal"
+                    className={errors.mandal ? 'input-error' : ''}
+                    value={formData.mandal}
+                    onChange={handleChange}
+                    placeholder="Mandal name"
+                    required
+                  />
+                  {errors.mandal && <p className="error-text"><AlertCircle size={12} /> {errors.mandal}</p>}
+                </div>
+
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>District</label>
+                    <input
+                      type="text"
+                      name="district"
+                      className="input-disabled"
+                      value={formData.district}
+                      readOnly
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label>PIN Code <span className="req">*</span></label>
+                    <input
+                      type="text"
+                      name="pincode"
+                      maxLength={6}
+                      pattern="[0-9]{6}"
+                      title="6-digit PIN code required"
+                      className={errors.pincode ? 'input-error' : ''}
+                      value={formData.pincode}
+                      onChange={(e) => setFormData({ ...formData, pincode: e.target.value.replace(/\D/g, '') })}
+                      placeholder="6-digit pincode"
+                      required
+                    />
+                    {errors.pincode && <p className="error-text"><AlertCircle size={12} /> {errors.pincode}</p>}
+                  </div>
+                </div>
+
+                {/* Submit Area */}
+                <div className="submit-area">
+                  <a
+                    href="/delivery"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="delivery-link"
                   >
                     <Info size={16} /> View Delivery Instructions
-                  </Link>
+                  </a>
 
                   <button
                     type="submit"
                     disabled={isSubmitting}
-                    className="btn btn-primary w-full py-5 text-xl flex items-center justify-center gap-3 shadow-blue-200"
-                    style={{ borderRadius: '1.25rem' }}
+                    className="btn-submit"
                   >
-                    {isSubmitting ? "Processing..." : <>Confirm your Order<Send size={20} /></>}
+                    {isSubmitting ? "Processing..." : <>Confirm your Order <Send size={20} /></>}
                   </button>
                 </div>
+
               </form>
             </div>
           </div>
+
         </div>
       </div>
 
+      {/* PURE CSS STYLES */}
       <style>{`
-        .checkout-summary-content { display: flex; flex-direction: column; gap: 1.5rem; }
-        .checkout-summary-image-wrapper { width: 100%; aspect-ratio: 1; border-radius: 1.25rem; background: #f8fafc; padding: 1rem; border: 1px solid #f1f5f9; display: flex; align-items: center; justify-content: center; overflow: hidden; }
-        .checkout-summary-img { width: 100%; height: 100%; object-fit: contain; }
-        .checkout-summary-details { flex: 1; }
-        .checkout-summary-name { font-weight: 800; font-size: 1.1rem; line-height: 1.3; margin-bottom: 0.5rem; color: #1e293b; }
-        .checkout-summary-price { font-weight: 900; font-size: 1.5rem; color: var(--color-primary); }
-
-        @media (min-width: 1024px) {
-          .checkout-summary-content { flex-direction: row; align-items: center; gap: 1.25rem; }
-          .checkout-summary-image-wrapper { width: 100px; height: 100px; flex-shrink: 0; }
-          .checkout-summary-name { font-size: 1rem; }
-          .checkout-summary-price { font-size: 1.25rem; }
+        .checkout-page {
+          background-color: #f8fafc;
+          min-height: 100vh;
+          padding: 3rem 1.5rem;
+          font-family: system-ui, -apple-system, sans-serif;
+          color: #1e293b;
         }
 
-        .form-label { font-size: 0.85rem; font-weight: 700; color: #64748b; margin-bottom: 0.5rem; display: block; }
-        .form-input-premium { 
-          width: 100%; 
-          padding: 1.15rem 1.5rem; 
-          border: 1.5px solid #E2E8F0; 
-          border-radius: 1.25rem; 
-          outline: none; 
-          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        .checkout-loading {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          height: 60vh;
+          font-size: 1.5rem;
+          color: #64748b;
+          font-weight: 600;
+        }
+
+        .checkout-container {
+          max-width: 1100px;
+          margin: 0 auto;
+        }
+
+        /* Back Link */
+        .back-link {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.5rem;
+          color: #1e3a8a;
+          text-decoration: none;
+          font-weight: 700;
+          margin-bottom: 2rem;
+          transition: color 0.2s;
+        }
+        .back-link:hover { color: #1e40af; text-decoration: underline; }
+
+        /* Grid Layout */
+        .checkout-grid {
+          display: flex;
+          gap: 2rem;
+          align-items: flex-start;
+        }
+        .checkout-col-summary { flex: 1; min-width: 300px; }
+        .checkout-col-form { flex: 2; }
+
+        /* Summary Card */
+        .summary-card {
+          background: white;
+          border-radius: 1.5rem;
+          padding: 2rem;
+          box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
+          border: 1px solid #f1f5f9;
+          position: sticky;
+          top: 6rem;
+        }
+        .summary-header {
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+          margin-bottom: 1.5rem;
+        }
+        .summary-header h2 { font-size: 1.25rem; font-weight: 800; margin: 0; color: #0f172a; }
+        .icon-blue { color: #2563eb; }
+
+        .product-details-layout {
+          display: flex;
+          flex-direction: column;
+          gap: 1.5rem;
+        }
+        .product-image-box {
+          width: 100%;
+          aspect-ratio: 1;
+          background: #f8fafc;
+          border-radius: 1rem;
+          border: 1px solid #e2e8f0;
+          padding: 1rem;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .product-image-box img { max-width: 100%; max-height: 100%; object-fit: contain; }
+        .product-info-text h3 { font-size: 1.2rem; font-weight: 800; margin: 0 0 0.5rem 0; line-height: 1.3; }
+        .price-text { font-size: 1.5rem; font-weight: 900; color: #1e3a8a; margin: 0 0 1rem 0; }
+        .delivery-badge {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.5rem;
+          background: #f0fdf4;
+          color: #16a34a;
+          padding: 0.5rem 0.75rem;
+          border-radius: 0.5rem;
+          font-size: 0.85rem;
+          font-weight: 700;
+        }
+
+        /* Form Card */
+        .form-card {
+          background: white;
+          border-radius: 2rem;
+          padding: 3rem;
+          box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+          border: 1px solid #f1f5f9;
+        }
+        .form-title {
+          font-size: 1.8rem;
+          font-weight: 900;
+          margin: 0 0 2rem 0;
+          padding-left: 1rem;
+          border-left: 5px solid #1e3a8a;
+          color: #0f172a;
+        }
+
+        .order-form {
+          display: flex;
+          flex-direction: column;
+          gap: 1.5rem;
+        }
+        .form-row {
+          display: flex;
+          gap: 1.5rem;
+        }
+        .form-group {
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          gap: 0.5rem;
+        }
+        .full-width { width: 100%; flex: unset; }
+        
+        .form-group label {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          font-size: 0.9rem;
+          font-weight: 700;
+          color: #475569;
+        }
+        .req { color: #ef4444; }
+
+        .form-group input {
+          padding: 1rem 1.25rem;
+          border: 1.5px solid #e2e8f0;
+          border-radius: 1rem;
           font-size: 1rem;
           color: #1e293b;
-          background-color: #fcfdfe;
+          outline: none;
+          transition: all 0.2s;
+          background: #fcfdfe;
         }
-        .form-input-premium:focus { 
-          border-color: var(--color-primary); 
-          box-shadow: 0 0 0 5px rgba(30, 58, 138, 0.08); 
+        .form-group input:focus {
+          border-color: #2563eb;
+          box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1);
           background: white;
-          transform: translateY(-1px);
         }
-        .shadow-blue-200 { box-shadow: 0 20px 25px -5px rgba(30, 58, 138, 0.2), 0 10px 10px -5px rgba(30, 58, 138, 0.1); }
+        .form-group input.input-error { border-color: #ef4444; background: #fef2f2; }
+        .form-group input.input-disabled { background: #f1f5f9; color: #94a3b8; cursor: not-allowed; }
+        
+        .error-text {
+          display: flex;
+          align-items: center;
+          gap: 0.25rem;
+          color: #ef4444;
+          font-size: 0.75rem;
+          font-weight: 600;
+          margin: 0;
+        }
+
+        /* Divider */
+        .section-divider {
+          display: flex;
+          align-items: center;
+          gap: 1rem;
+          margin: 1rem 0;
+        }
+        .line { flex: 1; height: 1px; background: #e2e8f0; }
+        .divider-text {
+          font-size: 0.75rem;
+          font-weight: 800;
+          color: #94a3b8;
+          text-transform: uppercase;
+          letter-spacing: 0.1em;
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+        }
+
+        /* Submit Area */
+        .submit-area {
+          display: flex;
+          flex-direction: column;
+          gap: 1rem;
+          margin-top: 2rem;
+        }
+        .delivery-link {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 0.5rem;
+          background: #eff6ff;
+          color: #2563eb;
+          text-decoration: none;
+          padding: 0.75rem;
+          border-radius: 1rem;
+          font-size: 0.9rem;
+          font-weight: 700;
+          transition: all 0.2s;
+        }
+        .delivery-link:hover { background: #dbeafe; color: #1d4ed8; text-decoration: underline; }
+
+        .btn-submit {
+          background: #1e3a8a;
+          color: white;
+          border: none;
+          padding: 1.25rem;
+          border-radius: 1.5rem;
+          font-size: 1.2rem;
+          font-weight: 800;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 0.75rem;
+          cursor: pointer;
+          transition: all 0.2s;
+          box-shadow: 0 10px 20px -5px rgba(30, 58, 138, 0.3);
+        }
+        .btn-submit:hover { background: #1e40af; transform: translateY(-2px); box-shadow: 0 15px 25px -5px rgba(30, 58, 138, 0.4); }
+        .btn-submit:disabled { background: #94a3b8; cursor: not-allowed; transform: none; box-shadow: none; }
+
+        /* Responsive Mobile Layout */
+        @media (max-width: 1024px) {
+          .checkout-grid { flex-direction: column; }
+          .checkout-col-summary, .checkout-col-form { width: 100%; }
+          .summary-card { position: static; margin-bottom: 2rem; }
+          .product-details-layout { flex-direction: row; align-items: center; }
+          .product-image-box { width: 120px; height: 120px; flex-shrink: 0; }
+        }
+
+        @media (max-width: 640px) {
+          .checkout-page { padding: 1.5rem 1rem; }
+          .form-card { padding: 1.5rem; border-radius: 1.5rem; }
+          .form-title { font-size: 1.5rem; margin-bottom: 1.5rem; }
+          .form-row { flex-direction: column; gap: 1.5rem; }
+          .product-details-layout { flex-direction: column; align-items: flex-start; }
+          .product-image-box { width: 100%; aspect-ratio: 16/9; height: auto; }
+        }
       `}</style>
     </div>
   );

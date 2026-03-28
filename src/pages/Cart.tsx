@@ -2,14 +2,19 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Trash2, ArrowLeft, ShoppingCart, ExternalLink } from 'lucide-react';
 import { useCart } from '../context/CartContext';
+import { useAuth } from '../context/AuthContext';
+
 
 const Cart: React.FC = () => {
   const { cart, removeFromCart, cartTotal } = useCart();
+  const { user } = useAuth();
+
 
   const handleWhatsAppCheckout = () => {
-    const phoneNumber = "919392348398"; // From WhatsAppButton.tsx
+    const phoneNumber = "919959916507"; // From WhatsAppButton.tsx
     const itemsList = cart.map(item => `- ${item.name} (₹${item.price.toLocaleString()})`).join('\n');
-    const message = `I am interested to buy the following items:\n${itemsList}\n\nTotal Price: ₹${cartTotal.toLocaleString()}\n\nShare more details.`;
+    const userName = user?.name || "Customer";
+    const message = `I am ${userName} and I am interested to buy the following items:\n${itemsList}\n\nTotal Price: ₹${cartTotal.toLocaleString()}\n\nShare more details.`;
     window.open(`https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`, '_blank');
   };
 

@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { 
-  MessageCircle, ArrowLeft, CheckCircle, Shield, Truck, 
-  AlertCircle, ShoppingCart, ShieldCheck, Award, Layers, Info 
+import {
+  MessageCircle, ArrowLeft, CheckCircle, Shield, Truck,
+  AlertCircle, ShoppingCart, ShieldCheck, Award, Layers, Info
 } from 'lucide-react';
 import Zoom from 'react-medium-image-zoom';
 import 'react-medium-image-zoom/dist/styles.css';
@@ -97,7 +97,7 @@ function ProductDetails() {
         <div style={{ padding: 'clamp(1rem, 5vw, 3rem)', display: 'flex', flexDirection: 'column' }}>
           <div className="flex-between mb-4 flex-wrap gap-4">
             <span className="badge">{product.category}</span>
-            <span className="badge">{product.category}</span>
+
           </div>
 
           <h1 className="heading-lg" style={{ marginBottom: '1rem' }}>{product.name}</h1>
@@ -154,36 +154,41 @@ function ProductDetails() {
           <div className="flex flex-col mb-10 gap-4" style={{ marginBottom: '3rem' }}>
             {(product.promises?.genuine !== false) && (
               <div className="flex items-center gap-3 text-slate-700 font-semibold bg-slate-50 p-3 rounded-xl border border-slate-100/50">
-                <ShieldCheck size={22} className="text-primary" /> 
+                <ShieldCheck size={22} className="text-primary" />
+                &nbsp;
                 <span>100% Genuine Branded Product</span>
+                <br /><br />
               </div>
             )}
             {product.promises?.warranty && (
               <div className="flex items-center gap-3 text-slate-700 font-semibold bg-slate-50 p-3 rounded-xl border border-slate-100/50">
-                <Shield size={22} className="text-primary" /> 
+                <Shield size={22} className="text-primary" />
+                &nbsp;
                 <span>Official Warranty Support</span>
+                <br /><br />
               </div>
             )}
             {product.promises?.delivery && (
               <div className="flex bg-blue-50/50 p-4 rounded-xl items-center justify-between border border-blue-100">
                 <div className="flex items-center gap-3 text-blue-900 font-bold">
-                  <Truck size={22} className="text-primary" /> 
+                  <Truck size={22} className="text-primary" />
+                  &nbsp;
                   <span>Delivery Available</span>
                 </div>
                 <Link to="/delivery" className="flex items-center gap-1.5 text-sm text-primary hover:underline font-extrabold bg-white px-3 py-1.5 rounded-lg shadow-sm">
-                  <Info size={14} /> Instructions
+                  &nbsp;<Info size={14} /> Instructions
                 </Link>
               </div>
             )}
             {product.promises?.steel && (
               <div className="flex items-center gap-3 text-slate-700 font-semibold bg-slate-50 p-3 rounded-xl border border-slate-100/50">
-                <Layers size={22} className="text-primary" /> 
+                <Layers size={22} className="text-primary" />
                 <span>Premium Stainless Steel</span>
               </div>
             )}
             {product.promises?.guaranty && (
               <div className="flex items-center gap-3 text-slate-700 font-semibold bg-slate-50 p-3 rounded-xl border border-slate-100/50">
-                <Award size={22} className="text-primary" /> 
+                <Award size={22} className="text-primary" />
                 <span>Product Guaranty Included</span>
               </div>
             )}
@@ -199,7 +204,7 @@ function ProductDetails() {
             <Link
               to={product.inStock ? `/checkout/${product.id}` : '#'}
               className={`btn btn-primary product-action-btn ${!product.inStock ? 'disabled-btn' : ''}`}
-              style={{ 
+              style={{
                 opacity: product.inStock ? 1 : 0.6,
                 cursor: product.inStock ? 'pointer' : 'not-allowed',
                 textDecoration: 'none'

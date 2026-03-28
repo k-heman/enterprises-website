@@ -9,6 +9,8 @@ const MyOrders: React.FC = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [showCancelReason, setShowCancelReason] = useState<string | null>(null);
+  const [cancelReason, setCancelReason] = useState('');
 
   useEffect(() => {
     if (user) {
@@ -30,15 +32,43 @@ const MyOrders: React.FC = () => {
     }
   };
 
-  const handleCancelOrder = async (id: string) => {
-    if (!window.confirm("Are you sure you want to cancel this order?")) return;
+  const handleCancelOrder = (id: string) => {
+    if (showCancelReason === id) {
+      setShowCancelReason(null);
+      setCancelReason('');
+    } else {
+      setShowCancelReason(id);
+    }
+  };
 
-    setCancellingId(id);
+  const submitCancellation = async (order: Order) => {
+    if (!cancelReason.trim()) {
+      alert("Please enter a required reason for cancellation before submitting.");
+      return;
+    }
+
+    setCancellingId(order.id);
     try {
-      await updateOrder(id, { status: 'cancelled' });
-      setOrders(prev => prev.map(order =>
-        order.id === id ? { ...order, status: 'cancelled' } : order
+      // Update DB status
+      await updateOrder(order.id, { status: 'cancelled' });
+
+      // Update local state
+      setOrders(prev => prev.map(o =>
+        o.id === order.id ? { ...o, status: 'cancelled' } : o
       ));
+
+      // WhatsApp Message logic
+      const phoneNumber = "919959916507";
+      const userName = user?.name || user?.username || "Customer";
+      const message = `Hello, \n I am ${userName}, I am cancelling my order of the product ${order.productName}. \n Reason of cancelling: ${cancelReason}`;
+
+      // Clean up states
+      setShowCancelReason(null);
+      setCancelReason('');
+
+      // Open WhatsApp
+      window.open(`https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`, '_blank');
+
     } catch (error) {
       console.error("Error cancelling order:", error);
       alert("Failed to cancel order. Please try again.");
@@ -47,270 +77,521 @@ const MyOrders: React.FC = () => {
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'confirmed': return 'text-blue-600 bg-blue-50 border-blue-100';
-      case 'Available': return 'text-emerald-600 bg-emerald-50 border-emerald-100';
-      case 'Not Available': return 'text-rose-600 bg-rose-50 border-rose-100';
-      case 'Shipping': return 'text-purple-600 bg-purple-50 border-purple-100';
-      case 'Ready for delivery': return 'text-indigo-600 bg-indigo-50 border-indigo-100';
-      case 'delivered': return 'text-green-600 bg-green-50 border-green-100';
-      case 'cancelled': return 'text-red-600 bg-red-50 border-red-100';
-      default: return 'text-orange-600 bg-orange-50 border-orange-100';
+  // Pure CSS Color Mapping for Status
+  const getStatusStyle = (status: string) => {
+    const s = (status || 'pending').toLowerCase();
+    switch (s) {
+      case 'confirmed': return { bg: '#eff6ff', text: '#2563eb', border: '#dbeafe' };
+      case 'available': return { bg: '#ecfdf5', text: '#059669', border: '#d1fae5' };
+      case 'not available': return { bg: '#fff1f2', text: '#e11d48', border: '#ffe4e6' };
+      case 'shipping': return { bg: '#faf5ff', text: '#9333ea', border: '#f3e8ff' };
+      case 'ready for delivery': return { bg: '#eef2ff', text: '#4f46e5', border: '#e0e7ff' };
+      case 'delivered': return { bg: '#f0fdf4', text: '#16a34a', border: '#dcfce7' };
+      case 'cancelled': return { bg: '#fef2f2', text: '#dc2626', border: '#fee2e2' };
+      default: return { bg: '#fff7ed', text: '#ea580c', border: '#ffedd5' }; // Pending
     }
   };
 
-  const getDeliveryStatusColor = (status: string) => {
-    switch (status) {
-      case 'available': return 'text-emerald-600 bg-emerald-50 border-emerald-100';
-      case 'shipping': return 'text-purple-600 bg-purple-50 border-purple-100';
-      case 'delivered': return 'text-green-600 bg-green-50 border-green-100';
-      case 'not available': return 'text-red-600 bg-red-50 border-red-100';
-      case 'Ready for delivery': return 'text-indigo-600 bg-indigo-50 border-indigo-100';
-      default: return 'text-slate-400 bg-slate-50 border-slate-100';
+  const getDeliveryStatusStyle = (status: string) => {
+    const s = (status || 'pending').toLowerCase();
+    switch (s) {
+      case 'available': return { bg: '#ecfdf5', text: '#059669', border: '#d1fae5' };
+      case 'shipping': return { bg: '#faf5ff', text: '#9333ea', border: '#f3e8ff' };
+      case 'delivered': return { bg: '#f0fdf4', text: '#16a34a', border: '#dcfce7' };
+      case 'not available': return { bg: '#fff1f2', text: '#e11d48', border: '#ffe4e6' };
+      case 'ready for delivery': return { bg: '#eef2ff', text: '#4f46e5', border: '#e0e7ff' };
+      default: return { bg: '#f8fafc', text: '#64748b', border: '#f1f5f9' }; // Processing
     }
   };
 
   if (loading) {
     return (
-      <div className="section container flex-center" style={{ minHeight: '60vh' }}>
-        <div className="animate-pulse flex flex-col items-center">
-          <div className="h-12 w-12 bg-primary opacity-20 rounded-full mb-4"></div>
-          <p className="text-muted">Loading your orders...</p>
-        </div>
+      <div className="loading-container">
+        <p>Loading your orders...</p>
       </div>
     );
   }
 
   return (
-    <div className="section container animate-fade-in" style={{ padding: '3rem 1.5rem', minHeight: '85vh' }}>
-      <div className="mb-10 text-center md:text-left">
-        <h1 className="heading-lg flex items-center justify-center md:justify-start gap-4 text-primary">
-          &nbsp; &nbsp; <ShoppingBag size={40} /> &nbsp; &nbsp; My Orders
-        </h1>
-        <br />
-        <p className="text-muted mt-3 text-lg">Detailed history and tracking of your purchase requests.</p>
-      </div>
-      <br />
+    <div className="my-orders-page">
+      <div className="container-max">
 
-      {orders.length === 0 ? (
-        <div className="card text-center py-20 bg-gray-50 border-dashed border-2 flex flex-col items-center rounded-3xl">
-          <Package size={80} className="text-gray-300 mb-6" />
-          <h2 className="heading-sm text-gray-500 mb-2">No orders yet</h2>
-          <p className="text-muted mb-8 max-w-md">Your purchase history is empty. Start browsing our premium collection to place your first order.</p>
-          <button onClick={() => window.location.href = '/products'} className="btn btn-primary px-10 py-4 rounded-2xl shadow-lg">Browse Products</button>
-          <br />
-          <br />
-          <br />
-          <br />
-          <br />
-          <br />
-          <br />
+        {/* Header */}
+        <div className="page-header">
+          <h1 className="page-title">
+            <ShoppingBag size={36} color="#1e3a8a" /> My Orders
+          </h1>
+          <p className="page-subtitle">Detailed history and tracking of your purchase requests.</p>
         </div>
-      ) : (
-        <div className="grid grid-cols-1 gap-10">
-          {orders.map((order) => (
-            <div key={order.id} className="order-card-premium card">
-              <div className="flex flex-col md:flex-row gap-8">
-                {/* Product Section */}
-                <div className="flex items-center gap-6 flex-grow">
-                  <div className="order-img-wrapper">
-                    <img
-                      src={order.productImage || '/logo.png'}
-                      alt={order.productName}
-                      className="order-img-fit"
-                      onError={(e) => { (e.target as HTMLImageElement).src = '/logo.png'; }}
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <h3 className="text-2xl font-black text-slate-800 leading-tight">{order.productName}</h3>
-                    <div className="flex items-center gap-2 text-slate-400 font-bold text-sm">
-                      <Clock size={16} />
-                      Ordered on {new Date(order.createdAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}
-                    </div>
-                    <div className="text-xs font-black text-primary bg-primary/5 px-2 py-1 rounded inline-block w-fit mt-1">
-                      ID: {order.id.slice(-8).toUpperCase()}
-                    </div>
-                  </div>
-                </div>
 
-                {/* Status Section */}
-                <div className="flex flex-col sm:flex-row md:flex-col lg:flex-row gap-8 md:min-w-[350px] justify-between lg:items-center px-2">
-                  {order.status === 'cancelled' ? (
-                    <div className="flex flex-col items-center justify-center bg-red-50/50 p-6 rounded-2xl border border-red-100 w-full animate-pulse">
-                      <XCircle size={40} className="text-red-500 mb-2" />
-                      <p className="text-red-600 font-black text-lg">Order Cancelled</p>
-                      <p className="text-red-400 text-xs font-bold uppercase tracking-widest mt-1">No further action needed</p>
+        {/* Empty State */}
+        {orders.length === 0 ? (
+          <div className="empty-state">
+            <Package size={72} color="#cbd5e1" className="empty-icon" />
+            <h2>No orders yet</h2>
+            <p>Your purchase history is empty. Start browsing our premium collection to place your first order.</p>
+            <button onClick={() => window.location.href = '/products'} className="browse-btn">
+              Browse Products
+            </button>
+          </div>
+        ) : (
+          /* Orders List */
+          <div className="orders-list">
+            {orders.map((order) => (
+              <div key={order.id} className="order-card">
+
+                <div className="card-main-row">
+                  {/* Column 1: Product */}
+                  <div className="col-product">
+                    <div className="img-box">
+                      <img
+                        src={order.productImage || '/logo.png'}
+                        alt={order.productName}
+                        onError={(e) => { (e.target as HTMLImageElement).src = '/logo.png'; }}
+                      />
                     </div>
-                  ) : (
-                    <>
-                      <div className="status-box flex-grow">
-                        <p className="status-title">Current Progress</p>
-                        <div className={`status-badge ${getStatusColor(order.status)}`}>
-                          {order.status.toLowerCase() === 'available' && <Package size={18} />}
-                          {order.status.toLowerCase() === 'shipping' && <Truck size={18} />}
-                          {order.status.toLowerCase() === 'ready for delivery' && <Truck size={18} />}
-                          {order.status.toLowerCase() === 'pending' && <Clock size={18} />}
-                          {order.status.toLowerCase() === 'delivered' && <CheckCircle2 size={18} />}
-                          <span className="capitalize">{order.status}</span>
+                    <div className="product-text">
+                      <h3>{order.productName || 'Unknown Product'}</h3>
+                      <div className="order-date">
+                        <Clock size={16} />
+                        <span>Ordered on {order.createdAt ? new Date(order.createdAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : 'Unknown Date'}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Column 2: Status */}
+                  <div className="col-status">
+                    {order.status === 'cancelled' ? (
+                      <div className="cancelled-alert">
+                        <XCircle size={32} />
+                        <div>
+                          <h4>Order Cancelled</h4>
+                          <p>No further action needed</p>
                         </div>
                       </div>
-
-                      <div className="status-box flex-grow">
-                        <p className="status-title">Delivery Info</p>
-                        <div className="flex flex-col gap-3">
-                          <div className={`status-badge-premium ${getDeliveryStatusColor(order.deliveryStatus)}`}>
-                            <span className="capitalize">{order.deliveryStatus || 'Processing'}</span>
+                    ) : (
+                      <>
+                        <div className="status-block">
+                          <label>Current Progress</label>
+                          <div
+                            className="badge"
+                            style={{
+                              backgroundColor: getStatusStyle(order.status).bg,
+                              color: getStatusStyle(order.status).text,
+                              borderColor: getStatusStyle(order.status).border
+                            }}
+                          >
+                            <span style={{ textTransform: 'capitalize' }}>{order.status || 'Pending'}</span>
                           </div>
+                        </div>
 
-                          {/* Task: Hide date if not available */}
-                          {order.deliveryDate &&
-                            order.deliveryStatus !== 'not available' && (
-                              <div className="flex items-center gap-3 text-sm font-black text-slate-600 bg-white px-5 py-3 rounded-2xl border border-slate-200 shadow-sm animate-in fade-in slide-in-from-bottom-2 duration-500">
-                                <Calendar size={18} className="text-primary" />
-                                <span>Exp. Delivery: {new Date(order.deliveryDate).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                        <div className="status-block">
+                          <label>Delivery Info</label>
+                          <div className="delivery-stack">
+                            <div
+                              className="badge-small"
+                              style={{
+                                backgroundColor: getDeliveryStatusStyle(order.deliveryStatus).bg,
+                                color: getDeliveryStatusStyle(order.deliveryStatus).text,
+                                borderColor: getDeliveryStatusStyle(order.deliveryStatus).border
+                              }}
+                            >
+                              <span style={{ textTransform: 'capitalize' }}>{order.deliveryStatus || 'Processing'}</span>
+                            </div>
+
+                            {order.deliveryDate && order.deliveryStatus !== 'not available' && (
+                              <div className="expected-date">
+                                <Calendar size={15} color="#1e3a8a" />
+                                <span>Exp: {new Date(order.deliveryDate).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}</span>
                               </div>
                             )}
+                          </div>
                         </div>
-                      </div>
-                    </>
-                  )}
+                      </>
+                    )}
+                  </div>
+
+                  {/* Column 3: Action */}
+                  <div className="col-action">
+                    {order.status === 'pending' && (
+                      <button
+                        onClick={() => handleCancelOrder(order.id)}
+                        disabled={cancellingId === order.id}
+                        className={`btn-cancel-trigger ${showCancelReason === order.id ? 'active' : ''}`}
+                      >
+                        <XCircle size={24} />
+                        <span>{showCancelReason === order.id ? 'Close' : 'Cancel Order'}</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
 
-                {/* Action Section */}
-                {order.status === 'pending' && (
-                  <div className="flex items-center justify-center md:border-l border-slate-100 md:pl-10">
+                {/* Cancel Reason Section (Hidden by default) */}
+                {showCancelReason === order.id && (
+                  <div className="cancel-reason-section">
+                    <label>Reason for cancelling the order <span style={{ color: 'red' }}>*</span></label>
+                    <textarea
+                      placeholder="Please tell us why you are cancelling (Required)..."
+                      value={cancelReason}
+                      onChange={(e) => setCancelReason(e.target.value)}
+                      rows={3}
+                      required
+                    />
                     <button
-                      onClick={() => handleCancelOrder(order.id)}
-                      disabled={cancellingId === order.id}
-                      className="cancel-btn group"
-                      title="Cancel Order"
+                      onClick={() => submitCancellation(order)}
+                      disabled={cancellingId === order.id || !cancelReason.trim()}
+                      className="btn-submit-cancel"
                     >
-                      <XCircle size={32} className="group-hover:scale-110 transition-transform" />
-                      <span className="md:hidden font-black text-sm uppercase tracking-wider">Cancel My Order</span>
+                      {cancellingId === order.id ? 'Processing...' : 'Submit & Message on WhatsApp'}
                     </button>
                   </div>
                 )}
               </div>
-            </div>
-          ))}
-        </div>
-      )}
+            ))}
+          </div>
+        )}
+      </div>
 
+      {/* PURE CSS STYLES */}
       <style>{`
-        .order-card-premium {
-          padding: 2.5rem;
-          background: white;
-          border-radius: 2.5rem;
-          box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.05);
-          border: 1.5px solid #f8fafc;
-          transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        .my-orders-page {
+          background-color: #f8fafc;
+          min-height: 100vh;
+          padding: 4rem 1.5rem;
+          font-family: system-ui, -apple-system, sans-serif;
+          color: #1e293b;
         }
-        .order-card-premium:hover {
-          transform: translateY(-5px);
-          box-shadow: 0 20px 50px -10px rgba(0, 0, 0, 0.1);
-          border-color: #e2e8f0;
+
+        .container-max {
+          max-width: 1000px;
+          margin: 0 auto;
         }
-        .order-img-wrapper {
-          width: 120px;
-          height: 120px;
-          flex-shrink: 0;
-          background: #f8fafc;
-          border-radius: 2rem;
-          padding: 1rem;
+
+        .loading-container {
+          min-height: 60vh;
           display: flex;
           align-items: center;
           justify-content: center;
-          border: 1.5px solid #f1f5f9;
+          font-size: 1.2rem;
+          color: #64748b;
         }
-        .order-img-fit {
-          width: 100%;
-          height: 100%;
+
+        /* Header */
+        .page-header {
+          margin-bottom: 3rem;
+          text-align: left;
+        }
+        .page-title {
+          font-size: 2.2rem;
+          font-weight: 800;
+          color: #1e3a8a;
+          display: flex;
+          align-items: center;
+          gap: 1rem;
+          margin: 0 0 0.5rem 0;
+        }
+        .page-subtitle {
+          font-size: 1.1rem;
+          color: #64748b;
+          margin: 0;
+        }
+
+        /* Empty State */
+        .empty-state {
+          background: white;
+          border-radius: 2rem;
+          padding: 5rem 2rem;
+          text-align: center;
+          border: 2px dashed #e2e8f0;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 1rem;
+        }
+        .empty-state h2 { font-size: 1.8rem; margin: 0; color: #475569; }
+        .empty-state p { max-width: 400px; color: #94a3b8; line-height: 1.6; margin-bottom: 1.5rem; }
+        .browse-btn {
+          background-color: #1e3a8a;
+          color: white;
+          padding: 1rem 2.5rem;
+          border-radius: 1rem;
+          border: none;
+          font-size: 1.1rem;
+          font-weight: 700;
+          cursor: pointer;
+          transition: background 0.2s;
+        }
+        .browse-btn:hover { background-color: #1e40af; }
+
+        /* Order Cards */
+        .orders-list {
+          display: flex;
+          flex-direction: column;
+          gap: 2rem;
+        }
+
+        .order-card {
+          background: white;
+          border-radius: 1.5rem;
+          padding: 2rem;
+          box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
+          border: 1px solid #f1f5f9;
+          transition: transform 0.3s, box-shadow 0.3s;
+        }
+        .order-card:hover {
+          transform: translateY(-3px);
+          box-shadow: 0 20px 30px -10px rgba(0, 0, 0, 0.08);
+        }
+
+        /* Card Desktop Layout */
+        .card-main-row {
+          display: flex;
+          gap: 2rem;
+          align-items: center;
+        }
+
+        /* Column 1: Product */
+        .col-product {
+          flex: 2;
+          display: flex;
+          align-items: center;
+          gap: 1.5rem;
+        }
+        .img-box {
+          width: 110px;
+          height: 110px;
+          background: #f8fafc;
+          border-radius: 1rem;
+          border: 1px solid #e2e8f0;
+          padding: 0.5rem;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+        }
+        .img-box img {
+          max-width: 100%;
+          max-height: 100%;
           object-fit: contain;
+          mix-blend-mode: multiply;
         }
-        .status-title {
-          font-size: 0.7rem;
-          font-weight: 900;
-          text-transform: uppercase;
-          letter-spacing: 0.15em;
-          color: #94a3b8;
-          margin-bottom: 0.75rem;
+        .product-text h3 {
+          font-size: 1.4rem;
+          font-weight: 800;
+          margin: 0 0 0.5rem 0;
+          color: #0f172a;
         }
-        .status-badge {
+        .order-date {
           display: flex;
           align-items: center;
           gap: 0.5rem;
-          font-size: 1rem;
-          font-weight: 800;
-          padding: 0.6rem 1.25rem;
-          border-radius: 1.25rem;
-          border-width: 1.5px;
-          width: fit-content;
+          color: #64748b;
+          font-size: 0.9rem;
+          font-weight: 600;
         }
-        .cancel-btn {
+
+        /* Column 2: Status */
+        .col-status {
+          flex: 1.5;
+          display: flex;
+          gap: 2rem;
+        }
+        .status-block {
+          display: flex;
+          flex-direction: column;
+          gap: 0.5rem;
+        }
+        .status-block label {
+          font-size: 0.7rem;
+          text-transform: uppercase;
+          letter-spacing: 0.05rem;
+          font-weight: 800;
+          color: #94a3b8;
+        }
+        .badge {
+          padding: 0.5rem 1rem;
+          border-radius: 2rem;
+          font-weight: 700;
+          font-size: 0.95rem;
+          border: 1.5px solid;
+          display: inline-flex;
+          align-items: center;
+          gap: 0.5rem;
+          width: max-content;
+        }
+        .delivery-stack {
+          display: flex;
+          flex-direction: column;
+          gap: 0.5rem;
+        }
+        .badge-small {
+          padding: 0.3rem 0.8rem;
+          border-radius: 0.5rem;
+          font-weight: 700;
+          font-size: 0.8rem;
+          border: 1px solid;
+          width: max-content;
+        }
+        .expected-date {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          font-size: 0.85rem;
+          font-weight: 600;
+          color: #475569;
+          background: #f8fafc;
+          padding: 0.4rem 0.8rem;
+          border-radius: 0.5rem;
+          border: 1px solid #e2e8f0;
+          width: max-content;
+        }
+
+        /* Cancelled Alert Box */
+        .cancelled-alert {
+          display: flex;
+          align-items: center;
+          gap: 1rem;
+          background: #fef2f2;
+          border: 1px solid #fee2e2;
+          padding: 1rem 1.5rem;
+          border-radius: 1rem;
+          color: #dc2626;
+          width: 100%;
+        }
+        .cancelled-alert h4 { margin: 0; font-weight: 800; font-size: 1.1rem; }
+        .cancelled-alert p { margin: 0; font-size: 0.8rem; opacity: 0.8; font-weight: 600; text-transform: uppercase; }
+
+        /* Column 3: Action */
+        .col-action {
+          flex: 0.5;
+          display: flex;
+          justify-content: flex-end;
+          border-left: 1px solid #f1f5f9;
+          padding-left: 1.5rem;
+        }
+        .btn-cancel-trigger {
+          background: white;
+          color: #ef4444;
+          border: 1.5px solid #fee2e2;
+          padding: 0.75rem 1rem;
+          border-radius: 1rem;
+          font-weight: 700;
+          cursor: pointer;
           display: flex;
           flex-direction: column;
           align-items: center;
           gap: 0.5rem;
-          color: #ef4444;
-          background: #fef2f2;
-          padding: 1rem;
-          border-radius: 1.5rem;
-          border: 1.5px solid #fee2e2;
           transition: all 0.2s;
-          cursor: pointer;
         }
-        .cancel-btn:hover {
+        .btn-cancel-trigger:hover, .btn-cancel-trigger.active {
           background: #ef4444;
           color: white;
           border-color: #ef4444;
         }
-        
-        .status-badge-premium {
-          display: flex;
-          align-items: center;
-          gap: 0.75rem;
-          padding: 0.75rem 1.5rem;
-          border-radius: 1rem;
-          font-size: 0.9rem;
-          font-weight: 900;
-          text-transform: uppercase;
-          letter-spacing: 0.05em;
-          border: 2px solid transparent;
-        }
 
-        .order-card-premium {
-          background: white;
-          border-radius: 2.5rem;
-          padding: 2.5rem;
-          margin-bottom: 2.5rem;
-          transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-          border: 1px solid #f1f5f9;
+        /* Cancel Reason Form */
+        .cancel-reason-section {
+          margin-top: 2rem;
+          padding-top: 2rem;
+          border-top: 1px dashed #e2e8f0;
+          display: flex;
+          flex-direction: column;
+          gap: 1rem;
+          animation: fadeIn 0.3s ease-in-out;
+        }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+        
+        .cancel-reason-section label {
+          font-size: 0.85rem;
+          font-weight: 800;
+          text-transform: uppercase;
+          color: #475569;
+          letter-spacing: 0.05em;
+        }
+        .cancel-reason-section textarea {
+          width: 100%;
+          padding: 1rem;
+          border-radius: 1rem;
+          border: 2px solid #e2e8f0;
+          font-family: inherit;
+          font-size: 1rem;
+          resize: vertical;
+          outline: none;
+          transition: border-color 0.2s;
+        }
+        .cancel-reason-section textarea:focus {
+          border-color: #ef4444;
+        }
+        .btn-submit-cancel {
+          background: #ef4444;
+          color: white;
+          border: none;
+          padding: 1rem;
+          border-radius: 1rem;
+          font-size: 1rem;
+          font-weight: 800;
+          cursor: pointer;
+          width: fit-content;
+          align-self: flex-start;
+          transition: background 0.2s;
+        }
+        .btn-submit-cancel:hover { background: #dc2626; }
+        .btn-submit-cancel:disabled { background: #fca5a5; cursor: not-allowed; }
+
+        /* Mobile Responsiveness */
+        @media (max-width: 900px) {
+          .col-status {
+            flex-direction: column;
+            gap: 1rem;
+          }
         }
 
         @media (max-width: 768px) {
-          .order-card-premium {
-            padding: 2rem;
-            border-radius: 2rem;
-            margin-bottom: 2rem;
+          .my-orders-page {
+            padding: 2rem 1rem;
           }
-          .order-img-wrapper {
-            width: 120px;
-            height: 120px;
-            border-radius: 1.5rem;
+          .page-header { text-align: center; }
+          .page-title { justify-content: center; font-size: 1.8rem; }
+          .card-main-row {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 1.5rem;
           }
-          .status-badge-premium {
-            font-size: 0.95rem;
-            padding: 0.75rem 1.25rem;
+          .col-product, .col-status, .col-action {
             width: 100%;
-            justify-content: center;
           }
-          .cancel-btn {
+          .col-status {
+            flex-direction: row;
+            justify-content: space-between;
+          }
+          .col-action {
+            border-left: none;
+            padding-left: 0;
+            border-top: 1px solid #f1f5f9;
+            padding-top: 1.5rem;
+            justify-content: stretch;
+          }
+          .btn-cancel-trigger {
             width: 100%;
             flex-direction: row;
             justify-content: center;
-            padding: 1rem;
-            border-radius: 1.25rem;
+          }
+          .btn-submit-cancel {
+            width: 100%;
+            align-self: stretch;
+          }
+        }
+
+        @media (max-width: 480px) {
+          .col-status {
+            flex-direction: column;
+          }
+          .img-box {
+            width: 80px;
+            height: 80px;
+          }
+          .product-text h3 {
+            font-size: 1.1rem;
           }
         }
       `}</style>

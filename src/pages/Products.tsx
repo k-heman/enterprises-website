@@ -42,9 +42,11 @@ function Products() {
   }, [activeCategory]);
 
   const filteredProducts = products.filter(product => {
+    if (!product) return false;
+    const q = (searchQuery || '').toLowerCase();
     const matchesSearch =
-      product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (product.description && product.description.toLowerCase().includes(searchQuery.toLowerCase()));
+      (product.name || '').toLowerCase().includes(q) ||
+      (product.description && (product.description || '').toLowerCase().includes(q));
     return matchesSearch;
   });
 
@@ -85,11 +87,11 @@ function Products() {
         <div className="category-scroll-container hide-scrollbar">
           {displayedCategories.map((cat) => (
             <button
-              key={cat.id}
-              onClick={() => setActiveCategory(cat.name)}
-              className={`category-pill ${activeCategory === cat.name ? 'active' : ''}`}
+              key={cat?.id || Math.random()}
+              onClick={() => setActiveCategory(cat?.name || 'All')}
+              className={`category-pill ${activeCategory === (cat?.name || '') ? 'active' : ''}`}
             >
-              {cat.name}
+              {cat?.name || 'Unknown'}
             </button>
           ))}
         </div>

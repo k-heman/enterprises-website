@@ -11,7 +11,7 @@ function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  
+
   const { login, register } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -41,7 +41,7 @@ function Login() {
 
     setLoading(true);
     let success = false;
-    
+
     if (isRegistering) {
       success = await register(username, password, mobileNumber);
       if (!success) {
@@ -53,7 +53,7 @@ function Login() {
         setError('Invalid credentials.');
       }
     }
-    
+
     setLoading(false);
 
     if (success) {
@@ -67,13 +67,13 @@ function Login() {
       <div className="login-modal card animate-fade-in-up">
         {/* Tabs */}
         <div className="login-tabs">
-          <button 
+          <button
             className={`tab-btn ${!isRegistering ? 'active' : ''}`}
             onClick={() => { setIsRegistering(false); setError(''); }}
           >
             Login
           </button>
-          <button 
+          <button
             className={`tab-btn ${isRegistering ? 'active' : ''}`}
             onClick={() => { setIsRegistering(true); setError(''); }}
           >
@@ -83,8 +83,11 @@ function Login() {
 
         <div className="login-content">
           <div className="text-center mb-8">
-            <h2 className="login-title">Welcome Back</h2>
+            <h2 className="login-title">
+              {isRegistering ? "Enter you details" : "Welcome Back"}
+            </h2>
           </div>
+
 
           {error && (
             <div className="error-alert">
@@ -118,14 +121,14 @@ function Login() {
                   type={showPassword ? "text" : "password"}
                   id="password"
                   className="login-input"
-                  placeholder="Enter your password"
+                  placeholder={isRegistering ? "Create your password" : "Enter your password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   disabled={loading}
                 />
-                <button 
-                  type="button" 
-                  className="eye-btn" 
+                <button
+                  type="button"
+                  className="eye-btn"
                   onClick={() => setShowPassword(!showPassword)}
                   aria-label={showPassword ? "Hide password" : "Show password"}
                 >
