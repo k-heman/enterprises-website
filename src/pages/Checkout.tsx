@@ -4,7 +4,7 @@ import { User, Phone, MapPin, Package, Send, AlertCircle, ArrowLeft, Info, Check
 import { addOrder, getProductById } from '../services/db';
 import type { Product } from '../services/db';
 import { useAuth } from '../context/AuthContext';
-import { formatCurrency } from '../components/ProductCard'; 
+import { formatCurrency } from '../components/ProductCard';
 
 const Checkout: React.FC = () => {
   const { id } = useParams<{ id: string }>();
